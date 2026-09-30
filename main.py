@@ -129,3 +129,34 @@ async def login(credentials: AuthCredentials):
         )
     except Exception as e:
         return JSONResponse(status_code=401, content={"error": "Invalid login credentials"})
+
+
+@app.get(
+    "/public/info",
+    status_code=200,
+    summary="Public Info",
+    description="Public information endpoint accessible by anyone",
+)
+async def public_info():
+    return {"message": "Welcome stranger! This info is public."}
+
+
+@app.get(
+    "/protected/profile",
+    summary="Protected User Profile",
+    description="Protected profile endpoint requiring Authorization Bearer token",
+)
+async def get_profile(request: Request):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        return JSONResponse(
+            status_code=401, content={"error": "Access token required"}
+        )
+
+    token = auth_header[7:].strip()
+    if not token:
+        return JSONResponse(
+            status_code=401, content={"error": "Access token required"}
+        )
+
+    return {"message": "Token presented", "token": token}
