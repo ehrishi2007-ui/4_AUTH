@@ -144,7 +144,7 @@ async def public_info():
 @app.get(
     "/protected/profile",
     summary="Protected User Profile",
-    description="Protected profile endpoint requiring Authorization Bearer token",
+    description="Protected profile endpoint verifying token via Supabase",
 )
 async def get_profile(request: Request):
     auth_header = request.headers.get("Authorization")
@@ -159,4 +159,29 @@ async def get_profile(request: Request):
             status_code=401, content={"error": "Access token required"}
         )
 
-    return {"message": "Token presented", "token": token}
+    try:
+        user_response = supabase.auth.get_user(token)
+        if not user_response or not user_response.user:
+            return JSONResponse(
+                status_code=401, content={"error": "Invalid or expired token"}
+            )
+
+        user = user_response.user
+        created_at_str = (
+            user.created_at.isoformat()
+            if hasattr(user.created_at, "isoformat")
+            else str(user.created_at)
+        )
+        return {
+            "id": user.id,
+            "email": user.email,
+            "created_at": created_at_str,
+        }
+    except AuthApiError:
+        return JSONResponse(
+            status_code=401, content={"error": "Invalid or expired token"}
+        )
+    except Exception:
+        return JSONResponse(
+            status_code=401, content={"error": "Invalid or expired token"}
+        )
