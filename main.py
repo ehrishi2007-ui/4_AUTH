@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Response, Depends, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from supabase import create_client, Client
 from supabase_auth.errors import AuthApiError
@@ -18,6 +19,7 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 PORT = int(os.getenv("PORT", 8000))
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+security_scheme = HTTPBearer(auto_error=False)
 
 
 class AuthCredentials(BaseModel):
@@ -33,7 +35,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Auth API with Supabase",
-    description="Authentication and protected routes API using Supabase Auth",
+    description="Authentication and protected routes API using Supabase Auth and Bearer JWT tokens",
     version="1.0",
     lifespan=lifespan,
 )
@@ -57,14 +59,17 @@ async def custom_http_exception_handler(request: Request, exc: HTTPException):
     )
 
 
-async def get_current_user(request: Request) -> User:
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401, detail={"error": "Access token required"}
-        )
+async def get_current_user(
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme),
+) -> User:
+    token: Optional[str] = credentials.credentials if credentials else None
 
-    token = auth_header[7:].strip()
+    if not token:
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header[7:].strip()
+
     if not token:
         raise HTTPException(
             status_code=401, detail={"error": "Access token required"}
